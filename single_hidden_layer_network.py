@@ -28,23 +28,33 @@ class LinearTransform(object):
     def forward(self, x):
     # DEFINE forward function
         self.x = x
-        z = np.dot(self.x, self.w) + self.b
-        return z
+        z_output = np.dot(self.x, self.w) + self.b
+        return z_output
 
-    def backward(self, grad_output, learning_rate=0.0, momentum=0.0, l2_penalty=0.0):
+    def backward(self, grad_output, learning_rate=1e-4, momentum=0.0, l2_penalty=0.0):
     # DEFINE backward function
     # ADD other operations in LinearTransform if needed
+        y = grad_output
+        grad_input = np.dot(y, np.transpose(self.w))
+        grad_weights = np.transpose(np.dot(np.transpose(y), self.x))
+        grad_biases = np.sum(grad_input, axis = 0)
+        self.w = self.w - learning_rate * grad_weights
+        self.b = self.b - learning_rate * grad_biases
+        return grad_input
 
 # This is a class for a ReLU layer max(x,0)
 class ReLU(object):
     def forward(self, x):
     # DEFINE forward function
-        self.ReLU_output = np.max(0, x)
-        return self.ReLU_output
+        self.x = x
+        self.relu_linear = np.max(0, self.x)
+        return self.relu_linear
 
     def backward(self, grad_output, learning_rate=0.0, momentum=0.0, l2_penalty=0.0):
     # DEFINE backward function
     # ADD other operations in ReLU if needed
+        self.relu_gradient = self.x * grad_output
+        return self.relu_gradient
 
 # This is a class for a sigmoid layer followed by a cross entropy layer, the reason 
 # this is put into a single layer is because it has a simple gradient form
@@ -57,7 +67,8 @@ class SigmoidCrossEntropy(object):
     def backward(self, grad_output, learning_rate=0.0, momentum=0.0, l2_penalty=0.0):
         # DEFINE backward function
         # ADD other operations and data entries in SigmoidCrossEntropy if needed
-
+        self.sigmoid_grad = (self.sigmoid_output - grad_output)
+        return self.sigmoid_output
 
 # This is a class for the Multilayer perceptron
 class MLP(object):
@@ -65,22 +76,46 @@ class MLP(object):
     def __init__(self, input_dims, hidden_units):
     # INSERT CODE for initializing the network
         w1 = np.random.randn(input_dims, hidden_units) * 0.01
-        b1 = np.zeros(1,hidden_units)
+        b1 = np.zeros(hidden_units, 1)
         w2 = np.random.randn(hidden_units, 1) * 0.01
         b2 = np.zeros(1, 1)
-        self.w = ["w1":w1, "w2":w2]
-        self.b = ["b1":b1, "b2":b2]
-        self.linear_transform1 = LinearTransform(self.w["w1"], self.b["b1"])
-        self.linear_transform2 = LinearTransform(self.w["w2"], self.b["b2"])
+
+        self.linear_transform1 = LinearTransform(w1, b1)
         self.relu = ReLU()
+        self.linear_transform2 = LinearTransform(w2, b2)
         self.sigmoid_entropy = SigmoidCrossEntropy()    
+
+    def loss_function(pred_y, target_y):
+        loss = - target_y * np.log(pred_y) - (1 - target_y) * np.log(1 - pred_y)
 
     def train(self, x_batch, y_batch, learning_rate, momentum, l2_penalty):
     # INSERT CODE for training the network
+        z_forward = self.linear_transform1.forward(x_batch)
+        z_forward = self.relu.forward(z_forward)
+        z_forward = self.linear_transform2.forward(z_forward)
+        z_forward = self.sigmoid_entropy.forward(z_forward)
+
+        loss == self.loss_function(z_forward, y_batch)
+
+        z_backward = self.sigmoid_entropy.backward(y_batch)
+        z_backward = self.linear_transform2.backward(z_backward)
+        z_backward = self.relu.backward(z_backward)
+        z_backward = self.linear_transform1.backward(z_backward)
+
+        return loss        
 
     def evaluate(self, x, y):
+        z_forward = self.linear_transform1.forward(x_batch)
+        z_forward = self.relu.forward(z_forward)
+        z_forward = self.linear_transform2.forward(z_forward)
+        z_forward = self.sigmoid_entropy.forward(z_forward)
+
+        pred_y = np.round(z_forward)
+        
+
     # INSERT CODE for testing the network
     # ADD other operations and data entries in MLP if needed
+        pass
 
 if __name__ == '__main__':
     if sys.version_info[0] < 3:
