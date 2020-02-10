@@ -23,6 +23,7 @@ except:
 
 import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 
 # This is a class for a LinearTransform layer which takes an input 
@@ -42,7 +43,7 @@ class LinearTransform(object):
         return z_output
 
     # This is a function for calculating the backward propagation for linear transform
-    def backward(self, grad_output, momentum = 0.9, learning_rate=1e-5):
+    def backward(self, grad_output, momentum = 0.1, learning_rate=1e-5):
         y = grad_output
         grad_input = np.matmul(y, np.transpose(self.weight_matrix))
         grad_weights = np.matmul(np.transpose(self.input_matrix), y) #np.transpose(np.dot(np.transpose(y), self.input_matrix))  
@@ -97,25 +98,25 @@ class MLP(object):
         self.linear_transform2 = LinearTransform(self.w2, self.b2)
         self.sigmoid_entropy = SigmoidCrossEntropy()    
 
-    def loss_function(self, pred_y, target_y, l2_penalty=0.01):
-        loss = -1 *( target_y * np.log(pred_y + 1e-8) + (1 - target_y) * np.log(1 - pred_y + 1e-8))
+    def loss_function(self, pred_y, target_y, l2_penalty=0.001):
+        loss = -1 *( target_y * np.log(pred_y + 10e-8) + (1 - target_y) * np.log(1 - pred_y + 10e-8))
         loss += l2_penalty / 2 * (np.sum(np.square(self.w1)) + np.sum(np.square(self.w2)))
         return loss
 
-    def train(self, x_batch, y_batch, l2_penalty=0):
-        z1_in = self.linear_transform1.forward(x_batch)
-        z1_out = self.relu.forward(z1_in)
-        z2_in = self.linear_transform2.forward(z1_out)
-        z2_out = self.sigmoid_entropy.forward(z2_in)
-        loss = self.loss_function(z2_out, y_batch, l2_penalty)
+    def train(self, x_batch, y_batch, l2_penalty=0.001):
+        linear_z1_in = self.linear_transform1.forward(x_batch)
+        linear_z1_out = self.relu.forward(linear_z1_in)
+        linear_z2_in = self.linear_transform2.forward(linear_z1_out)
+        linear_z2_out = self.sigmoid_entropy.forward(linear_z2_in)
+        loss = self.loss_function(linear_z2_out, y_batch, l2_penalty)
 
-        z2_backward = self.sigmoid_entropy.backward(z2_out, y_batch)
-        d_x2, d_w2, d_b2 = self.linear_transform2.backward(z2_backward)
-        z1_backward = self.relu.backward(d_x2)
-        d_x1, d_w1, d_b1 = self.linear_transform1.backward(z1_backward)
+        linear_z2_backward = self.sigmoid_entropy.backward(linear_z2_out, y_batch)
+        d_x2, d_w2, d_b2 = self.linear_transform2.backward(linear_z2_backward)
+        linear_z1_backward = self.relu.backward(d_x2)
+        d_x1, d_w1, d_b1 = self.linear_transform1.backward(linear_z1_backward)
 
         average_loss = np.mean(loss)
-        average_accuracy = 100 * np.mean((np.round(z2_out) == y_batch))
+        average_accuracy = 100 * np.mean((np.round(linear_z2_out) == y_batch))
         return average_accuracy, average_loss        
 
     def evaluate(self, x, y):
@@ -141,18 +142,15 @@ if __name__ == '__main__':
     test_y = data[b'test_labels']
 
     num_examples, input_dims = train_x.shape
-    num_epochs = 200
-    batch_size = 32
-    average_train_accuracy = []
-    average_train_loss = []
-    average_val_acc = []
-    average_val_loss = []
-
-    mlp = MLP(input_dims, hidden_units = 16)
+    num_epochs = 100
+    batch_size = 256
+    train_accuracy = []
+    test_accuracy = []
+    
+    mlp = MLP(input_dims, hidden_units = 32)
     num_batches = num_examples // batch_size
     for epoch in range(num_epochs):
         rand_idx = np.arange(num_examples)
-        # print(max(rand_idx))
         np.random.shuffle(rand_idx)
         train_x = train_x[rand_idx]
         train_y = train_y[rand_idx]
@@ -165,6 +163,15 @@ if __name__ == '__main__':
             train_loss += loss
             train_acc += accuracy
         train_loss = train_loss/num_batches
-        train_acc = train_acc/num_batches  
+        train_acc = train_acc/num_batches
+        train_accuracy.append(train_acc)  
         validation_loss, validation_acc = mlp.evaluate(test_x, test_y)
+        test_accuracy.append(validation_acc)
         print(' Epoch:{}     Train Loss: {:.3f}    Train Acc.: {:.2f}%    Test Loss:  {:.3f}    Test Acc.:  {:.2f}%'.format(epoch, train_loss, train_acc, validation_loss, validation_acc))
+    plt.plot(train_accuracy, label="train")
+    plt.plot(test_accuracy, label="test")
+    plt.xlabel("epochs")
+    plt.ylabel("accuracy")
+    plt.title("performance with learning_rate = 1e-5")
+    plt.legend(loc="upper left")
+    plt.show()
